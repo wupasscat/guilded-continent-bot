@@ -3,10 +3,11 @@ import logging.handlers
 import os
 import time
 from typing import Literal
+import datetime
 
 import aiosqlite
-import discord
-from discord import app_commands
+import guilded
+from guilded.ext import commands
 from dotenv import load_dotenv
 
 from census_client import main
@@ -62,8 +63,8 @@ class CustomFormatter(logging.Formatter): # Formatter
         return formatter.format(record)
 
 # Create logger
-logging.getLogger('discord.http').setLevel(logging.INFO)
-log = logging.getLogger('discord')
+logging.getLogger('guilded.http').setLevel(logging.INFO)
+log = logging.getLogger('guilded')
 if LOG_LEVEL is None:
     log.setLevel(logging.INFO)
 else:
@@ -72,8 +73,6 @@ else:
 handler = logging.StreamHandler()
 handler.setFormatter(CustomFormatter())
 log.addHandler(handler)
-# Disable VoiceClient warnings
-discord.VoiceClient.warn_nacl = False
 
 # Check for continents.db
 db_exists = os.path.exists('continents.db')
@@ -81,9 +80,11 @@ if db_exists == False:
     log.error("Database does not exist!")
 
 # Setup Discord
-intents = discord.Intents.default()
-client = discord.Client(intents=intents)
-tree = app_commands.CommandTree(client)
+# intents = discord.Intents.default()
+# client = discord.Client(intents=intents)
+# tree = app_commands.CommandTree(client)
+
+bot = commands.Bot(user_id='d9LJjyZ4', command_prefix='!')
 
 # Collect data from db and create embed
 async def get_from_db(server: str):
@@ -92,7 +93,8 @@ async def get_from_db(server: str):
     SELECT * FROM {server}
     """
     async with db.execute(sql) as cursor: # Execute query
-        embedVar = discord.Embed(title=server[0].upper() + server[1:], color=0x5865F2, timestamp=discord.utils.utcnow()) # Create embed title
+        embed_time = datetime.datetime.utcnow()
+        embedVar = guilded.Embed(title=server[0].upper() + server[1:], color=0x5865F2, timestamp=embed_time) # Create embed title
         row_timestamps = []
         async for row in cursor:
             cont = row[1] # Row 1 is continents
@@ -115,28 +117,27 @@ async def get_from_db(server: str):
 
 # Discord
 # Refresh button
-class MyView(discord.ui.View):
-    def __init__(self, server):
-        super().__init__(timeout=None)
-        self.server = server
-    @discord.ui.button(label="Refresh",style=discord.ButtonStyle.primary, emoji="🔄")
-    async def refresh_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        log.info(f"Refresh /continents triggered for {self.server[0].upper() + self.server[1:]}")
-        embedVar = await get_from_db(self.server)
-        await interaction.response.edit_message(embed=embedVar, view=self)
+# class MyView(guilded.ui.View):
+#     def __init__(self, server):
+#         super().__init__(timeout=None)
+#         self.server = server
+#     @guilded.ui.button(label="Refresh",style=guilded.ButtonStyle.primary, emoji="🔄")
+#     async def refresh_button(self, interaction: guilded.Interaction, button: guilded.ui.Button):
+#         log.info(f"Refresh /continents triggered for {self.server[0].upper() + self.server[1:]}")
+#         embedVar = await get_from_db(self.server)
+#         await interaction.response.edit_message(embed=embedVar, view=self)
 
 # /continents
-@tree.command(name = "continents", description = "See open continents on a server")
-async def continents(interaction, server: Literal['Connery', 'Miller', 'Cobalt', 'Emerald', 'Jaeger', 'Soltech']):
+@bot.command(name = "continents", description = "See open continents on a server")
+async def continents(ctx, server: Literal['Connery', 'Miller', 'Cobalt', 'Emerald', 'Jaeger', 'Soltech']):
     log.info(f"Command /continents triggered for {server}")
     server = server[0].lower() + server[1:]
     embedVar = await get_from_db(server)
-    await interaction.response.send_message(embed=embedVar, view=MyView(server))
+    await ctx.send(embed=embedVar) # , view=MyView(server)
 
-@client.event
+@bot.event
 async def on_ready():
-    await tree.sync()
-    log.info('Bot has logged in as {0.user}'.format(client))
+    log.info('Bot has logged in as {0.user}'.format(bot))
     await main() # Run census_client.py
 
-client.run(TOKEN, log_handler=None)
+bot.run(TOKEN)
