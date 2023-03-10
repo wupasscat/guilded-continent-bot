@@ -1,0 +1,9 @@
+version: '3.4'
+services:
+    continentbot:
+        container_name: continent-bot
+        environment:
+            - DISCORD_TOKEN=discord bot token
+            - CENSUS_API_KEY=s:example
+            - GUILD_IDS=None
+        image: 'wupasscat/continentbot:latest'
