@@ -251,7 +251,11 @@ async def main():
             t = time.perf_counter()
             for i in WORLD_IDS: # Server names
                 server_id = WORLD_IDS[i] # Save server id
-                open_continents = await _get_open_zones(client, server_id) # Get open continents of server_id
+                try:
+                    open_continents = await _get_open_zones(client, server_id) # Get open continents of server_id
+                except auraxium.errors.ServerError as ServerError: # Handle Unknown server error
+                    log.error(ServerError)
+                    pass
                 # List open continents with names
                 named_open_continents = []
                 for s in open_continents:
